@@ -15,7 +15,7 @@ taxas<-lapply(blastFiles[1:18],function(ii){
     x$accession<-sapply(strsplit(x$tName,'\\|'),'[[',4)
     x$taxa<-accessionToTaxa(x$accession,'dump/accessionTaxa.sql')
     x$maxBit<-ave(x$bitScore,x$qName,FUN=max)
-    x<-x[x$bitScore==x$maxBit,]
+    x<-x[x$bitScore==x$maxBit&!is.na(x$taxa),]
     taxonomy<-getTaxonomy(x$taxa,taxaNodes,taxaNames)
     taxaAssigns<-do.call(rbind,by(as.data.frame(taxonomy,stringsAsFactors=FALSE),x$qName,FUN=condenseTaxa))
     bestScore<-x[!duplicated(x$qName),c('qName','alignLength','percIdent')]
