@@ -2,7 +2,7 @@
 source('taxaId.R')
 
 blastFiles<-list.files('work','.blast.gz$',full.names=TRUE)
-taxas<-lapply(blastFiles[1:18],function(ii){
+taxas<-lapply(blastFiles,function(ii){
   message(ii)
   outFile<-sprintf('%s_taxa.csv',sub('.blast.gz$','',ii))
   if(file.exists(outFile)){
