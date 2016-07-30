@@ -1,4 +1,5 @@
 
+library(dnar)
 source('taxaId.R')
 
 blastFiles<-list.files('work','.blast.gz$',full.names=TRUE)
@@ -84,9 +85,16 @@ pdf('out/heatSort.pdf',width=9,height=13)
   insetLegend(breaks,cols,insetPos=c(.05,.93,.25,.945))
 dev.off()
 
-#need to fill left on this for skipped taxa steps
-propId<-do.call(rbind,lapply(taxas,function(x)apply(x[,c('superkingdom','phylum','class','order','family','genus','species')],2,function(x)mean(is.na(x)))))
+sumId<-do.call(rbind,mclapply(taxas,function(xx){
+  #need to fill left on this for skipped taxa steps
+  xx<-apply(xx[,c('superkingdom','phylum','class','order','family','genus','species')],1,function(yy){
+    rev(fillDown(rev(yy),errorIfFirstEmpty=FALSE))
+  })
+  apply(xx,1,function(yy)sum(!is.na(yy)))
+},mc.cores=10))
+fastqFiles<-file.path('data',sub('.blast.gz','.trimmed.fastq',names(taxas)))
+readCounts<-as.numeric(cacheOperation('work/readCounts.Rdat',mclapply,fastqFiles,function(x)system(sprintf("wc -l %s|cut -f1 -d' '",x),intern=TRUE),mc.cores=10))/4
+
+propId<-sumId/matrix(readCounts,nrow=nrow(sumId),ncol=ncol(sumId))
+
 primer<-sub('KSG[0-9]+','',sub('_.*','',rownames(propId)))
-
-
-
