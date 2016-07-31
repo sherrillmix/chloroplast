@@ -1,6 +1,7 @@
 
 library(dnar)
 source('taxaId.R')
+targetTaxa<-c('superkingdom','phylum','class','order','family','genus','species')
 
 blastFiles<-list.files('work','.blast.gz$',full.names=TRUE)
 taxas<-lapply(blastFiles,function(ii){
@@ -29,7 +30,7 @@ taxas<-lapply(blastFiles,function(ii){
 names(taxas)<-basename(blastFiles)
 taxas<-mclapply(taxas,function(taxa){
   cat('.')
-  taxa$best<-apply(taxa[,c('superkingdom','phylum','class','order','family','genus','species')],1,lastNotNa)
+  taxa$best<-apply(taxa[,targetTaxa],1,lastNotNa)
   return(taxa)
 },mc.cores=10)
 
@@ -87,7 +88,7 @@ dev.off()
 
 sumId<-do.call(rbind,mclapply(taxas,function(xx){
   #need to fill left on this for skipped taxa steps
-  xx<-apply(xx[,c('superkingdom','phylum','class','order','family','genus','species')],1,function(yy){
+  xx<-apply(xx[,targetTaxa],1,function(yy){
     rev(fillDown(rev(yy),errorIfFirstEmpty=FALSE))
   })
   apply(xx,1,function(yy)sum(!is.na(yy)))
@@ -96,5 +97,18 @@ fastqFiles<-file.path('data',sub('.blast.gz','.trimmed.fastq',names(taxas)))
 readCounts<-as.numeric(cacheOperation('work/readCounts.Rdat',mclapply,fastqFiles,function(x)system(sprintf("wc -l %s|cut -f1 -d' '",x),intern=TRUE),mc.cores=10))/4
 
 propId<-sumId/matrix(readCounts,nrow=nrow(sumId),ncol=ncol(sumId))
+colnames(propId)<-targetTaxa
 
-primer<-sub('KSG[0-9]+','',sub('_.*','',rownames(propId)))
+primers<-sub('KSG[0-9]+','',sub('_.*','',rownames(propId)))
+cols<-rainbow.lab(length(unique(primers)),alpha=.6)
+names(cols)<-unique(primers)
+
+pdf('out/mapped.pdf')
+plot(1,1,type='n',ylab='Proportion of reads mapped',xlab='',xaxt='n',ylim=c(0,1),las=1,xlim=c(1,ncol(propId)))
+axis(1,1:ncol(propId),sub('super','',colnames(propId)))
+#text(1:ncol(propId), y=convertLineToUser(.8), labels=colnames(propId), srt=45, adj=c(1,1), xpd=TRUE)
+for(ii in 1:nrow(propId)){
+  lines(1:ncol(propId),propId[ii,],col=cols[primers[ii]])
+}
+dev.off()
+
