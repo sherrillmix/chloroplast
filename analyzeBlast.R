@@ -9,7 +9,7 @@ taxas<-lapply(blastFiles,function(ii){
   outFile<-sprintf('%s_taxa.csv',sub('.blast.gz$','',ii))
   if(file.exists(outFile)){
     message(' Reading ',outFile)
-    taxaAssigns<-read.csv(outFile,row.names=1)
+    taxaAssigns<-read.csv(outFile,row.names=1,stringsAsFactors=FALSE)
   }else{
     message(' Creating ',outFile)
     x<-read.table(ii,stringsAsFactors=FALSE)
@@ -91,24 +91,59 @@ sumId<-do.call(rbind,mclapply(taxas,function(xx){
   xx<-apply(xx[,targetTaxa],1,function(yy){
     rev(fillDown(rev(yy),errorIfFirstEmpty=FALSE))
   })
-  apply(xx,1,function(yy)sum(!is.na(yy)))
+  superkingdom<-sum(!is.na(xx[1,]))
+  xx[,xx[1,]!='Eukaryota']<-NA
+  onlyEuk<-apply(xx,1,function(yy)sum(!is.na(yy)))
+  return(c(superkingdom,onlyEuk))
 },mc.cores=10))
 fastqFiles<-file.path('data',sub('.blast.gz','.trimmed.fastq',names(taxas)))
 readCounts<-as.numeric(cacheOperation('work/readCounts.Rdat',mclapply,fastqFiles,function(x)system(sprintf("wc -l %s|cut -f1 -d' '",x),intern=TRUE),mc.cores=10))/4
 
 propId<-sumId/matrix(readCounts,nrow=nrow(sumId),ncol=ncol(sumId))
-colnames(propId)<-targetTaxa
+colnames(propId)<-c(targetTaxa[1],'Eukaryota',targetTaxa[-1])
 
 primers<-sub('KSG[0-9]+','',sub('_.*','',rownames(propId)))
 cols<-rainbow.lab(length(unique(primers)),alpha=.6)
 names(cols)<-unique(primers)
 
 pdf('out/mapped.pdf')
-plot(1,1,type='n',ylab='Proportion of reads mapped',xlab='',xaxt='n',ylim=c(0,1),las=1,xlim=c(1,ncol(propId)))
-axis(1,1:ncol(propId),sub('super','',colnames(propId)))
-#text(1:ncol(propId), y=convertLineToUser(.8), labels=colnames(propId), srt=45, adj=c(1,1), xpd=TRUE)
-for(ii in 1:nrow(propId)){
-  lines(1:ncol(propId),propId[ii,],col=cols[primers[ii]])
+par(mfrow=c(2,2),mar=c(4,4,1,.1))
+for(primer in unique(primers)){
+  plot(1,1,type='n',ylab='Proportion of reads mapped',xlab='',xaxt='n',ylim=c(0,1),las=1,xlim=c(1,ncol(propId)),main=primer,mgp=c(2.5,1,0))
+  #axis(1,1:ncol(propId),sub('super','',colnames(propId)))
+  axis(1,1:ncol(propId),FALSE)
+  text(1:ncol(propId), y=convertLineToUser(.8), labels=sub('super','',colnames(propId)), srt=45, adj=c(1,1), xpd=TRUE)
+  thisProps<-propId[primers==primer,]
+  paired<-aggregate(thisProps,list(sub('R[12]_.*','',rownames(thisProps))),function(x){
+    if(abs(log2(x[1]/x[2]))>log2(1.2))stop(simpleError('Mismatched pair'))
+    mean(x)
+  })[,-1] #remove group column
+  apply(paired,1,function(x)lines(1:ncol(propId),x,col='#00000077',lwd=2))
 }
 dev.off()
+
+kingTab<-table(unlist(lapply(taxas,function(x)x$superkingdom)),rep(names(taxas),sapply(taxas,nrow)))
+
+
+names(taxas)
+baseName<-sub('_S[0-9]+_L001_R[12]_.*$','',names(taxas))
+
+rares<-lapply(unique(baseName),function(xx){
+  thisTaxas<-unlist(lapply(taxas[baseName==xx],function(yy)yy$best))
+  return(rareEquation(table(thisTaxas),round(seq(.01,1,.005)*length(thisTaxas))))
+})
+names(rares)<-unique(baseName)
+primers<-sub('KSG[0-9]+','',sub('_.*','',names(rares)))
+xlim<-c(0,max(as.numeric(unlist(lapply(rares,names)))))
+ylim<-c(1,max(as.numeric(unlist(rares))))
+pdf('out/rarefaction.pdf')
+par(mfrow=c(2,2),mar=c(4,4.3,1,.1))
+for(primer in unique(primers)){
+  thisRares<-rares[primers==primer]
+  plot(1,1,type='n',ylab='Number of taxa',xlab='',ylim=ylim,las=1,xlim=xlim/100000,main=primer,mgp=c(3,1,0))
+  title(xlab='Reads sequenced (100,000)',mgp=c(2,1,0))
+  sapply(thisRares,function(x)lines(as.numeric(names(x))/100000,x,col='#00000077',lwd=2))
+}
+dev.off()
+
 
