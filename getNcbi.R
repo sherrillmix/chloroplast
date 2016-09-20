@@ -1,25 +1,17 @@
+#too much hassle. just download from ENA 
+#http://www.ebi.ac.uk/ena/data/search?query=rbcl
 library("rentrez")
-x<-entrez_search(db="nuccore", term="rbcl",retmax=as.integer(1e7))
-#seqs<-entrez_fetch('nuccore',x$ids,rettype='fasta')
+library(parallel)
+x<-entrez_search(db="nuccore", term="rbcl",retmax=as.integer(1e7),use_history=TRUE)
+#seqs<-entrez_fetch('nuccore',web_history=x$web_history,rettype='fasta',retmax=as.integer(1e7))
 
-allSeq<-c()
-stepSize<-10
-for(ii in seq(1,length(x$ids),stepSize)){
+stepSize<-1
+allSeq<-mclapply(seq(1,length(x$ids),stepSize),function(ii){
   message(ii)
-  end<-max(length(x$ids),ii+stepSize-1)
-  seqs<-entrez_fetch('nuccore',x$ids[ii:end],rettype='fasta')
-  if(length(gregexpr('>',seqs)[[1]])!=end-ii+1)stop(simpleError('Missing sequences'))
-  allSeq<-c(allSeq,seqs)
-  Sys.sleep(2)
-}
+  end<-min(length(x$ids),ii+stepSize-1)
+  seqs<-entrez_fetch('nuccore',web_history=x$web_history,rettype='fasta',retstart=ii,retmax=stepSize)
+  if(length(gregexpr('^>|\n>',seqs)[[1]])!=end-ii+1)stop(simpleError('Missing sequences'))
+  return(seqs)
+},mc.cores=15)
 
-#while(length(tmp<-entrez_search(db="nuccore", term="rbcl",retstart=as.integer(pos),retmax=as.integer(blockSize))$ids)>0){
-  #message(pos)
-  #ids<-c(ids,tmp)
-  #pos<-pos+blockSize
-  #message('Sleep')
-  #Sys.sleep(1)
-  #if(potentialProblem)stop(simpleError('Incomplete pull not final pull'))
-  #if(length(tmp)!=blockSize)potentialProblem<-TRUE
-#}
 
