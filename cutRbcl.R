@@ -23,11 +23,15 @@ if(!exists('seqs')){
   #depending on substring not to care about negative start or ends past string
   seqs$trim<-substring(seqs$seq,seqs$start-buffer,seqs$end+buffer)
   seqs$trim[!seqs$isPos]<-revComp(seqs$trim[!seqs$isPos])
-  write.fa(seqs$short,seqs$trim,'work/trimRbcl.fa')
+  write.fa(c('ref',seqs$short),c(ref$seq,seqs$trim),'work/trimRbcl.fa')
 }
 if(!file.exists('work/rbclAlign.fa')){
-  system('mafft --retree 2 --maxiterate 1000 --thread 50 work/trimRbcl.fa>work/rbclAlign.fa')
+  system('mafft --retree 1 --maxiterate 0 --thread 50 work/trimRbcl.fa>work/rbclAlign.fa')
 }
+mafft<-read.fa('work/rbclAlign.fa')
+png('test.png',height=5000,width=5000,res=500)
+  plotDNA(mafft$seq)
+dev.off()
 
 lAlign<-cacheOperation('work/rbclAlign.Rdat',levenAlign,seqs$trim,ref$seq,substring1=TRUE,nThread=56)
 dists<-leven(seqs$trim,ref$seq,substring1=TRUE,nThread=56)
