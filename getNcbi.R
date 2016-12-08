@@ -1,5 +1,6 @@
 #too much hassle. just download from ENA 
 #http://www.ebi.ac.uk/ena/data/search?query=rbcl
+#http://www.ebi.ac.uk/ena/data/search?query=matk
 library("rentrez")
 library(parallel)
 x<-entrez_search(db="nuccore", term="rbcl",retmax=as.integer(1e7),use_history=TRUE)
